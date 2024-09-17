@@ -13,6 +13,9 @@
 #include <gazebo/transport/Node.hh>
 #include "livox_laser_simulation/csv_reader.hpp"
 #include "livox_laser_simulation/livox_ode_multiray_shape.h"
+#include <sensor_msgs/PointCloud2.h>
+#include <sensor_msgs/point_cloud_conversion.h>
+
 
 namespace gazebo {
 
@@ -56,11 +59,13 @@ void LivoxPointsPlugin::Load(gazebo::sensors::SensorPtr _parent, sdf::ElementPtr
     ROS_INFO_STREAM("ros topic name:" << curr_scan_topic);
     ros::init(argc, argv, curr_scan_topic);
     rosNode.reset(new ros::NodeHandle);
-    rosPointPub = rosNode->advertise<sensor_msgs::PointCloud>(curr_scan_topic, 5);
+    // rosPointPub = rosNode->advertise<sensor_msgs::PointCloud>(curr_scan_topic, 5);
+    rosPointPub = rosNode->advertise<sensor_msgs::PointCloud2>(curr_scan_topic, 5);
+
 
     raySensor = _parent;
     auto sensor_pose = raySensor->Pose();
-    SendRosTf(sensor_pose, raySensor->ParentName(), raySensor->Name());
+    // SendRosTf(sensor_pose, raySensor->ParentName(), raySensor->Name());
 
     node = transport::NodePtr(new transport::Node());
     node->Init(raySensor->WorldName());
@@ -117,7 +122,7 @@ void LivoxPointsPlugin::OnNewLaserScans() {
         msgs::LaserScan *scan = laserMsg.mutable_scan();
         InitializeScan(scan);
 
-        SendRosTf(parentEntity->WorldPose(), world->Name(), raySensor->ParentName());
+        // SendRosTf(parentEntity->WorldPose(), world->Name(), raySensor->ParentName());
 
         auto rayCount = RayCount();
         auto verticalRayCount = VerticalRayCount();
@@ -169,8 +174,13 @@ void LivoxPointsPlugin::OnNewLaserScans() {
             //    //                          pair.second.azimuth);
             //}
         }
+        sensor_msgs::PointCloud2 laserCloudMsg;
+        convertPointCloudToPointCloud2(scan_point, laserCloudMsg);
+        laserCloudMsg.header.stamp = scan_point.header.stamp;
+        laserCloudMsg.header.frame_id = scan_point.header.frame_id;
+
         if (scanPub && scanPub->HasConnections()) scanPub->Publish(laserMsg);
-        rosPointPub.publish(scan_point);
+        rosPointPub.publish(laserCloudMsg);
         ros::spinOnce();
     }
 }
